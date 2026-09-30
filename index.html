@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的便利貼看板 - Sticky Notes</title>
+    <!-- 引入 Tailwind CSS 進行現代化視覺構建 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Google Fonts (Inter + Noto Sans TC) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 24px 24px;
+            min-height: 100vh;
+        }
+
+        /* 便利貼色彩與陰影專屬樣式 */
+        .note-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 2px 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .note-card:hover {
+            transform: translateY(-4px) rotate(0.5deg);
+            box-shadow: 4px 12px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        /* 便利貼顏色配對 */
+        .color-yellow { background-color: #fef08a; border-color: #fde047; color: #713f12; }
+        .color-pink   { background-color: #fbcfe8; border-color: #f472b6; color: #831843; }
+        .color-green  { background-color: #bbf7d0; border-color: #4ade80; color: #14532d; }
+        .color-blue   { background-color: #bae6fd; border-color: #38bdf8; color: #0c4a6e; }
+        .color-purple { background-color: #e9d5ff; border-color: #c084fc; color: #581c87; }
+
+        /* 文字輸入區域自動去邊框並符合便利貼樣式 */
+        .note-textarea {
+            background: transparent;
+            resize: none;
+            outline: none;
+        }
+
+        .note-textarea::placeholder {
+            color: rgba(0, 0, 0, 0.35);
+        }
+
+        /* 自訂滾動條 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 999px;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-slate-800">
+
+    <!-- 頁頭控制列 -->
+    <header class="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30 px-4 py-4 sm:px-8">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            
+            <!-- 標題區域 -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-400 flex items-center justify-center text-white text-xl shadow-md shadow-amber-200">
+                    📌
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-800 tracking-tight">我的便利貼看板</h1>
+                    <p class="text-xs text-slate-500">點擊新增便利貼，內容自動儲存至 LocalStorage</p>
+                </div>
+            </div>
+
+            <!-- 工具列：選擇新增顏色與按鈕 -->
+            <div class="flex items-center gap-3 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+                <!-- 顏色選擇器組合 -->
+                <div class="flex items-center gap-1.5 px-2" id="color-picker-group">
+                    <button data-color="yellow" title="黃色" class="color-btn w-6 h-6 rounded-full bg-amber-300 ring-2 ring-offset-1 ring-amber-500 transition-all scale-110"></button>
+                    <button data-color="pink" title="粉色" class="color-btn w-6 h-6 rounded-full bg-pink-300 hover:scale-105 transition-all"></button>
+                    <button data-color="green" title="綠色" class="color-btn w-6 h-6 rounded-full bg-emerald-300 hover:scale-105 transition-all"></button>
+                    <button data-color="blue" title="藍色" class="color-btn w-6 h-6 rounded-full bg-sky-300 hover:scale-105 transition-all"></button>
+                    <button data-color="purple" title="紫色" class="color-btn w-6 h-6 rounded-full bg-purple-300 hover:scale-105 transition-all"></button>
+                </div>
+
+                <!-- 新增按鈕 -->
+                <button 
+                    id="add-note-btn"
+                    class="bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm px-4 py-2 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    新增便利貼
+                </button>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- 主要內容區：便利貼看板網格 -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-8">
+        
+        <!-- 空狀態提示 -->
+        <div id="empty-state" class="hidden flex-col items-center justify-center py-20 text-center">
+            <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center text-3xl mb-4 text-slate-400">
+                📝
+            </div>
+            <h3 class="text-lg font-semibold text-slate-700">目前沒有任何便利貼</h3>
+            <p class="text-slate-400 text-sm mt-1 max-w-sm">點擊上方「新增便利貼」按鈕，立即記錄您的點子、工作事項或備忘錄！</p>
+        </div>
+
+        <!-- 便利貼網格布局 -->
+        <div id="notes-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <!-- 便利貼項目會透過 JavaScript 動態新增在此區域 -->
+        </div>
+
+    </main>
+
+    <!-- 頁腳 -->
+    <footer class="border-t border-slate-200 py-4 text-center text-xs text-slate-400">
+        便利貼看板 • 資料儲存於本機 LocalStorage
+    </footer>
+
+    <script>
+        // LocalStorage Key 名稱
+        const STORAGE_KEY = 'sticky_notes_data_v1';
+
+        // 預設選擇的新便利貼顏色
+        let selectedColor = 'yellow';
+
+        // 初始化便利貼資料陣列
+        let notes = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [
+            {
+                id: 'note_default_1',
+                text: '👋 歡迎使用便利貼看板！\n\n您可以：\n1. 點擊文字直接開始編輯\n2. 從上方選擇不同顏色建立便利貼\n3. 變更現有便利貼色彩或隨時刪除',
+                color: 'yellow',
+                updatedAt: new Date().toISOString()
+            },
+            {
+                id: 'note_default_2',
+                text: '💡 提示：所有內容都會自動儲存在您的瀏覽器中，重新整理頁面也不會遺失！',
+                color: 'blue',
+                updatedAt: new Date().toISOString()
+            }
+        ];
+
+        // 取得 DOM 元素
+        const notesGrid = document.getElementById('notes-grid');
+        const emptyState = document.getElementById('empty-state');
+        const addNoteBtn = document.getElementById('add-note-btn');
+        const colorPickerGroup = document.getElementById('color-picker-group');
+
+        // 儲存資料至 LocalStorage
+        function saveNotes() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+        }
+
+        // 格式化日期時間
+        function formatDate(isoString) {
+            const date = new Date(isoString);
+            return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        }
+
+        // 渲染所有便利貼
+        function renderNotes() {
+            notesGrid.innerHTML = '';
+
+            if (notes.length === 0) {
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+            } else {
+                emptyState.classList.add('hidden');
+                emptyState.classList.remove('flex');
+
+                notes.forEach(note => {
+                    const noteElement = createNoteElement(note);
+                    notesGrid.appendChild(noteElement);
+                });
+            }
+        }
+
+        // 建立單個便利貼 DOM 元素
+        function createNoteElement(note) {
+            const card = document.createElement('div');
+            card.className = `note-card color-${note.color} rounded-2xl border p-4 flex flex-col justify-between h-64 transition-all relative group`;
+            card.dataset.id = note.id;
+
+            // 便利貼頭部：日期與操作選單
+            const header = document.createElement('div');
+            header.className = 'flex items-center justify-between mb-2 pb-2 border-b border-black/10';
+
+            // 日期標籤
+            const dateSpan = document.createElement('span');
+            dateSpan.className = 'text-[11px] font-medium opacity-60';
+            dateSpan.textContent = formatDate(note.updatedAt);
+
+            // 右側按鈕組（換色與刪除）
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity';
+
+            // 換色下拉選項
+            const colorSelect = document.createElement('select');
+            colorSelect.className = 'text-xs bg-black/5 hover:bg-black/10 border-0 rounded-lg px-1.5 py-0.5 cursor-pointer font-medium focus:ring-0';
+            const colors = [
+                { value: 'yellow', name: '🟡 黃' },
+                { value: 'pink',   name: '🔴 粉' },
+                { value: 'green',  name: '🟢 綠' },
+                { value: 'blue',   name: '🔵 藍' },
+                { value: 'purple', name: '🟣 紫' }
+            ];
+
+            colors.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.value;
+                opt.textContent = c.name;
+                if (c.value === note.color) opt.selected = true;
+                colorSelect.appendChild(opt);
+            });
+
+            colorSelect.addEventListener('change', (e) => {
+                updateNoteColor(note.id, e.target.value);
+            });
+
+            // 刪除按鈕
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'p-1 hover:bg-black/10 rounded-lg text-black/60 hover:text-black transition-colors';
+            deleteBtn.title = '刪除便利貼';
+            deleteBtn.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+            `;
+            deleteBtn.addEventListener('click', () => {
+                deleteNote(note.id);
+            });
+
+            actionsDiv.appendChild(colorSelect);
+            actionsDiv.appendChild(deleteBtn);
+
+            header.appendChild(dateSpan);
+            header.appendChild(actionsDiv);
+
+            // 便利貼內容輸入框
+            const textarea = document.createElement('textarea');
+            textarea.className = 'note-textarea w-full flex-1 text-sm leading-relaxed font-normal focus:ring-0';
+            textarea.placeholder = '在此寫下想法...';
+            textarea.value = note.text;
+
+            // 即時儲存文字內容
+            textarea.addEventListener('input', (e) => {
+                updateNoteText(note.id, e.target.value);
+            });
+
+            card.appendChild(header);
+            card.appendChild(textarea);
+
+            return card;
+        }
+
+        // 新增便利貼
+        function addNote() {
+            const newNote = {
+                id: 'note_' + Date.now(),
+                text: '',
+                color: selectedColor,
+                updatedAt: new Date().toISOString()
+            };
+
+            notes.unshift(newNote); // 放至最前頭
+            saveNotes();
+            renderNotes();
+
+            // 自動將焦點移至新便利貼輸入框
+            setTimeout(() => {
+                const firstCardTextarea = notesGrid.querySelector(`[data-id="${newNote.id}"] textarea`);
+                if (firstCardTextarea) firstCardTextarea.focus();
+            }, 50);
+        }
+
+        // 更新文字內容
+        function updateNoteText(id, text) {
+            const note = notes.find(n => n.id === id);
+            if (note) {
+                note.text = text;
+                note.updatedAt = new Date().toISOString();
+                saveNotes();
+            }
+        }
+
+        // 更新便利貼顏色
+        function updateNoteColor(id, newColor) {
+            const note = notes.find(n => n.id === id);
+            if (note) {
+                note.color = newColor;
+                saveNotes();
+                renderNotes();
+            }
+        }
+
+        // 刪除便利貼
+        function deleteNote(id) {
+            notes = notes.filter(n => n.id !== id);
+            saveNotes();
+            renderNotes();
+        }
+
+        // 工具列顏色選擇器切換事件
+        colorPickerGroup.addEventListener('click', (e) => {
+            const btn = e.target.closest('.color-btn');
+            if (!btn) return;
+
+            selectedColor = btn.dataset.color;
+
+            // 更新 UI 選取外框狀態
+            colorPickerGroup.querySelectorAll('.color-btn').forEach(b => {
+                b.classList.remove('ring-2', 'ring-offset-1', 'scale-110');
+            });
+
+            btn.classList.add('ring-2', 'ring-offset-1', 'scale-110');
+            
+            // 根據顏色動態調整按鈕外框
+            const ringColors = {
+                yellow: 'ring-amber-500',
+                pink:   'ring-pink-500',
+                green:  'ring-emerald-500',
+                blue:   'ring-sky-500',
+                purple: 'ring-purple-500'
+            };
+            
+            btn.classList.add(ringColors[selectedColor] || 'ring-slate-500');
+        });
+
+        // 按鈕事件綁定
+        addNoteBtn.addEventListener('click', addNote);
+
+        // 頁面初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            renderNotes();
+        });
+    </script>
+</body>
+</html>
